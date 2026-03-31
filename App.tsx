@@ -121,7 +121,7 @@ const App: React.FC = () => {
             <LanguageSwitcher />
             <div className="flex items-center gap-4">
             <div className="hidden md:block bg-white/20 px-6 py-3 rounded-2xl backdrop-blur-md">
-              <p className="text-sm font-bold">WhatsApp: +7 (900) 123-45-67</p>
+              <p className="text-sm font-bold">WhatsApp: +972 509131305</p>
             </div>
             <button 
               onClick={toggleAdmin}
