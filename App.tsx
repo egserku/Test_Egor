@@ -111,7 +111,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-12">
-      <header className="gradient-bg text-white py-12 px-6 shadow-xl mb-12">
+      <header className="bg-[#4f46e5] bg-gradient-to-br from-indigo-500 to-purple-600 text-white py-12 px-6 shadow-xl mb-12">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div>
              <h1 className="text-4xl font-black tracking-tight cursor-pointer" onClick={() => setStep(Step.SELECT_CATEGORY)}>PRINTMASTER PRO</h1>
