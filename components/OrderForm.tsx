@@ -15,6 +15,8 @@ import { apiService } from '../services/apiService';
 import { School, InventoryItem } from '../types';
 import { useTranslation } from 'react-i18next';
 
+import { ProductPreview } from './ProductPreview';
+
 interface OrderFormProps {
   productType: ProductType;
   initialSubtype: OrderSubtype;
@@ -93,6 +95,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
     if (!inventory.length) return null;
     return inventory.filter(i => {
       if (i.productType !== productType || i.color !== colorName) return false;
+      // Filter by size if one is selected, to keep it consistent with the size grid
+      if (formData.size && i.size !== formData.size) return false;
       if (i.sleeve && formData.sleeve && i.sleeve !== formData.sleeve) return false;
       if (i.fabric && formData.fabric && i.fabric !== formData.fabric) return false;
       return true;
@@ -221,6 +225,17 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
       </div>
 
       <div className="space-y-10">
+        <div className="animate-in fade-in duration-700">
+          <ProductPreview 
+            key={`${productType}-${formData.color}`}
+            productType={productType}
+            color={formData.color || COLORS[0].name}
+            hoodieType={formData.hoodieType}
+            printImages={formData.printImages || {}}
+            gender={formData.gender}
+          />
+        </div>
+
         {tips && (
           <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6">
              <div className="flex items-center gap-2 mb-3">
@@ -239,9 +254,9 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
             <div className="flex flex-wrap gap-4">
               {productType === ProductType.HOODIE ?
                 [
-                  { type: HoodieType.KANGAROO, img: '/assets/ui/hoodie_kangaroo.png', label: 'Кенгуру' },
-                  { type: HoodieType.ZIP, img: '/assets/ui/hoodie_zip.png', label: 'На молнии' },
-                  { type: HoodieType.SWEATER, img: '/assets/ui/hoodie_sweater.png', label: 'Свитшот' }
+                  { type: HoodieType.KANGAROO, img: '/assets/ui/hoodie_kangaroo.png', label: t('models.kangaroo') },
+                  { type: HoodieType.ZIP, img: '/assets/ui/hoodie_zip.png', label: t('models.zip') },
+                  { type: HoodieType.SWEATER, img: '/assets/ui/hoodie_sweater.png', label: t('models.sweater') }
                 ].map(({ type, img, label }) => (
                   <button
                     key={type}
@@ -254,9 +269,9 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
                 ))
                 :
                 [
-                  { type: CapType.BASEBALL, img: '/assets/ui/cap_baseball.png', label: 'Бейсболка' },
-                  { type: CapType.SNAPBACK, img: '/assets/ui/cap_snapback.png', label: 'Снэпбек' },
-                  { type: CapType.BEANIE, img: '/assets/ui/cap_beanie.png', label: 'Бини' }
+                  { type: CapType.BASEBALL, img: '/assets/ui/cap_baseball.png', label: t('models.baseball') },
+                  { type: CapType.SNAPBACK, img: '/assets/ui/cap_snapback.png', label: t('models.snapback') },
+                  { type: CapType.BEANIE, img: '/assets/ui/cap_beanie.png', label: t('models.beanie') }
                 ].map(({ type, img, label }) => (
                   <button
                     key={type}
@@ -401,18 +416,54 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
         {productType === ProductType.TSHIRT && !isTeamMode && (
           <div className="animate-in slide-in-from-left-4 duration-400">
             <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.sleeve_length')}</label>
-            <div className="flex flex-wrap gap-2">
-              {(initialSubtype === OrderSubtype.PERSONAL 
-                ? SLEEVES.BOY 
-                : (formData.gender === 'Девочка' ? SLEEVES.GIRL : SLEEVES.BOY)
-              ).map(s => (
-                <button key={s} onClick={() => setFormData({ ...formData, sleeve: s })} className={`px-6 h-12 rounded-2xl font-black text-[11px] uppercase border-2 transition-all ${formData.sleeve === s ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-gray-50 bg-gray-50 text-gray-300 hover:border-gray-200'}`}>{s}</button>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { type: 'Короткий', img: '/assets/ui/sleeve_short.png', label: t('order_form.sleeve_short') },
+                { type: 'Длинный', img: '/assets/ui/sleeve_long.png', label: t('order_form.sleeve_long') },
+                { type: '3/4', img: '/assets/ui/sleeve_3_4.png', label: t('order_form.sleeve_3_4') }
+              ].filter(s => 
+                (initialSubtype === OrderSubtype.PERSONAL 
+                  ? SLEEVES.BOY 
+                  : (formData.gender === 'Девочка' ? SLEEVES.GIRL : SLEEVES.BOY)
+                ).includes(s.type)
+              ).map(({ type, img, label }) => (
+                <button
+                  key={type}
+                  onClick={() => setFormData({ ...formData, sleeve: type })}
+                  className={`group relative flex flex-col items-center p-3 rounded-3xl border-2 transition-all duration-300 ${
+                    formData.sleeve === type
+                      ? 'border-indigo-600 bg-indigo-50 shadow-md scale-[1.02]'
+                      : 'border-gray-50 bg-gray-50/50 hover:border-gray-200 hover:bg-white'
+                  }`}
+                >
+                  <div className="w-full aspect-square mb-3 relative overflow-hidden rounded-2xl bg-white/80 p-2 group-hover:scale-105 transition-transform duration-500">
+                    <img 
+                      src={img} 
+                      alt={label} 
+                      className="w-full h-full object-contain mix-blend-multiply"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/shapes/svg?seed=' + type;
+                      }}
+                    />
+                  </div>
+                  <span className={`text-[10px] font-black uppercase tracking-widest text-center ${
+                    formData.sleeve === type ? 'text-indigo-700' : 'text-gray-400'
+                  }`}>
+                    {label}
+                  </span>
+                  {formData.sleeve === type && (
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg animate-in zoom-in duration-300">
+                      <span className="text-white text-[10px]">✓</span>
+                    </div>
+                  )}
+                </button>
               ))}
             </div>
           </div>
         )}
 
-        {!isTeamMode && (
+        {!isTeamMode && productType !== ProductType.CAP && (
           <div>
             <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.sizes')} {inventory.length > 0 && <span className="ml-2 text-[9px] text-gray-400 font-normal normal-case opacity-60">{t('order_form.stock_info')}</span>}</label>
             <div className="flex flex-wrap gap-2">
@@ -421,7 +472,18 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
                 const stock = getStockForSize(size);
                 const isOut = stock !== null && stock <= 0;
                 return (
-                  <button key={size} disabled={isOut} onClick={() => isMultiSizeMode ? updateMultiSizeQty(size, 1) : setFormData({ ...formData, size })} onContextMenu={(e) => { e.preventDefault(); if(isMultiSizeMode) updateMultiSizeQty(size, -1); }} className={`min-w-[54px] h-[54px] rounded-2xl font-bold text-sm transition-all flex flex-col items-center justify-center relative ${isOut ? 'bg-gray-50/50 text-gray-300 cursor-not-allowed border border-gray-100' : isSelected ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'bg-gray-50 text-gray-400 hover:bg-gray-200'}`}>
+                  <button 
+                    key={size} 
+                    disabled={isOut} 
+                    onClick={() => {
+                      if (isMultiSizeMode) {
+                        updateMultiSizeQty(size, 1);
+                      }
+                      setFormData(prev => ({ ...prev, size }));
+                    }} 
+                    onContextMenu={(e) => { e.preventDefault(); if(isMultiSizeMode) updateMultiSizeQty(size, -1); }} 
+                    className={`min-w-[54px] h-[54px] rounded-2xl font-bold text-sm transition-all flex flex-col items-center justify-center relative ${isOut ? 'bg-gray-50/50 text-gray-300 cursor-not-allowed border border-gray-100' : isSelected ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'bg-gray-50 text-gray-400 hover:bg-gray-200'}`}
+                  >
                     <span className={isOut ? 'opacity-40' : ''}>{size}</span>
                     {isMultiSizeMode && (multiSizeSelections[size] || 0) > 0 && <span className="absolute -top-2 -right-2 bg-indigo-200 text-indigo-900 text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">{multiSizeSelections[size]}</span>}
                     {stock !== null && !isOut && <span className={`absolute -bottom-1.5 text-[8px] font-black tracking-tight ${stock < 5 ? 'text-red-500' : 'text-gray-400'}`}>{stock}{t('order.pcs')}</span>}
@@ -442,7 +504,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
               const isOut = stock !== null && stock <= 0;
               return (
                 <div key={c.hex} className="flex flex-col items-center gap-1">
-                  <button disabled={isOut} onClick={() => isMultiColorMode ? setMultiColorSelections(p => ({...p, [c.name]: p[c.name] ? p[c.name] : 1})) : setFormData({ ...formData, color: c.name })} className={`w-full aspect-square rounded-[24px] transition-all relative flex items-center justify-center ${isOut ? 'opacity-20 cursor-not-allowed grayscale' : isSelected ? 'ring-4 ring-indigo-500 ring-offset-4 scale-[1.05]' : 'hover:scale-[1.05]'}`} style={{ backgroundColor: c.hex, border: c.hex === '#FFFFFF' ? '1px solid #e5e7eb' : 'none' }}>
+                  <button 
+                    disabled={isOut} 
+                    onClick={() => {
+                      if (isMultiColorMode) {
+                        setMultiColorSelections(p => ({...p, [c.name]: p[c.name] ? p[c.name] : 1}));
+                        setFormData(prev => ({ ...prev, color: c.name }));
+                      } else {
+                        setFormData(prev => ({ ...prev, color: c.name }));
+                      }
+                    }} 
+                    className={`w-full aspect-square rounded-[24px] transition-all relative flex items-center justify-center ${isOut ? 'opacity-20 cursor-not-allowed grayscale' : isSelected ? 'ring-4 ring-indigo-500 ring-offset-4 scale-[1.05]' : 'hover:scale-[1.05]'}`} 
+                    style={{ backgroundColor: c.hex, border: c.hex === '#FFFFFF' ? '1px solid #e5e7eb' : 'none' }}
+                  >
                     {isSelected && <div className={`w-8 h-8 rounded-full flex items-center justify-center ${c.hex === '#FFFFFF' ? 'bg-indigo-600' : 'bg-white'}`}>{isMultiColorMode ? <span className={`${c.hex === '#FFFFFF' ? 'text-white' : 'text-gray-900'} font-black text-xs`}>{multiColorSelections[c.name]}</span> : <span className={`${c.hex === '#FFFFFF' ? 'text-white' : 'text-gray-900'} font-black text-lg`}>✓</span>}</div>}
                   </button>
                   {stock !== null && !isOut && <span className={`text-[8px] font-black tracking-tight ${stock < 10 ? 'text-red-500' : 'text-gray-400'}`}>{stock}{t('order.pcs')}</span>}

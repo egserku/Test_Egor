@@ -111,29 +111,29 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-12">
-      <header className="bg-[#4f46e5] bg-gradient-to-br from-indigo-500 to-purple-600 text-white py-12 px-6 shadow-xl mb-12">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div>
-             <h1 className="text-4xl font-black tracking-tight cursor-pointer" onClick={() => setStep(Step.SELECT_CATEGORY)}>PRINTMASTER PRO</h1>
-             <p className="text-indigo-100 mt-2 font-medium">{t('home.subtitle')}</p>
+      <header className="bg-[#4f46e5] bg-gradient-to-br from-indigo-500 to-purple-600 text-white py-8 md:py-12 px-6 shadow-xl mb-8 md:mb-12">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-center md:text-left">
+             <h1 className="text-3xl md:text-4xl font-black tracking-tight cursor-pointer" onClick={() => setStep(Step.SELECT_CATEGORY)}>PRINTMASTER PRO</h1>
+             <p className="text-indigo-100 mt-1 md:mt-2 font-medium text-sm md:text-base">{t('home.subtitle')}</p>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
             <LanguageSwitcher />
-            <div className="flex items-center gap-4">
-            <div className="hidden md:block bg-white/20 px-6 py-3 rounded-2xl backdrop-blur-md">
-              <p className="text-sm font-bold">WhatsApp: +972 509131305</p>
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="hidden md:block bg-white/20 px-6 py-3 rounded-2xl backdrop-blur-md">
+                <p className="text-sm font-bold">WhatsApp: +972 509131305</p>
+              </div>
+              <button 
+                onClick={toggleAdmin}
+                className={`p-2.5 md:p-2 rounded-xl transition-all ${step === Step.ADMIN ? 'bg-white text-indigo-600' : 'bg-white/10 hover:bg-white/30 text-white'}`}
+                title="Панель управления"
+              >
+                {step === Step.ADMIN ? '🏠' : '⚙️'}
+              </button>
             </div>
-            <button 
-              onClick={toggleAdmin}
-              className={`p-2 rounded-xl transition-all ${step === Step.ADMIN ? 'bg-white text-indigo-600' : 'bg-white/10 hover:bg-white/30 text-white'}`}
-              title="Панель управления"
-            >
-              {step === Step.ADMIN ? '🏠' : '⚙️'}
-            </button>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
       <main className="max-w-6xl mx-auto px-6">
         

@@ -391,7 +391,7 @@
     "productType": "TSHIRT",
     "color": "Белый",
     "size": "M",
-    "quantity": 65,
+    "quantity": 20,
     "sleeve": "Длинный",
     "fabric": "DryFit"
   },
@@ -11380,28 +11380,28 @@
     "productType": "TSHIRT",
     "color": "Чёрный",
     "size": "4XL",
-    "quantity": 12
+    "quantity": 20
   },
   {
     "id": "1774441551221",
     "productType": "TSHIRT",
     "color": "Тёмно синий / Navy",
     "size": "4XL",
-    "quantity": 11
+    "quantity": 20
   },
   {
     "id": "1774441559447",
     "productType": "TSHIRT",
     "color": "Тёмно зелёный",
     "size": "4XL",
-    "quantity": 10
+    "quantity": 20
   },
   {
     "id": "1774441919901",
     "productType": "TSHIRT",
     "color": "Белый",
     "size": "M",
-    "quantity": 38,
+    "quantity": 20,
     "fabric": "100% хлопок"
   },
   {
@@ -11409,7 +11409,7 @@
     "productType": "TSHIRT",
     "color": "Белый",
     "size": "M",
-    "quantity": 3,
+    "quantity": 20,
     "sleeve": "3/4",
     "fabric": "DryFit"
   },
@@ -11418,6 +11418,6 @@
     "productType": "TSHIRT",
     "color": "Белый",
     "size": "M",
-    "quantity": 0
+    "quantity": 20
   }
 ]
