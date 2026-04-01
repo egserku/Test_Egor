@@ -153,8 +153,9 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
     setUploadingZones(prev => new Set(prev).add(place));
     
     try {
-      // Compress image to max 800x800 with 0.7 quality to keep it well under 1MB
-      const base64 = await compressImage(file, 800, 800, 0.7);
+      // Compress image aggressively to max 400x400 with 0.5 quality to ensure it fits well under 1MB
+      // especially when multiple images are added to the same order.
+      const base64 = await compressImage(file, 400, 400, 0.5);
       setFormData(prev => ({
         ...prev,
         printPlaces: prev.printPlaces?.includes(place) ? prev.printPlaces : [...(prev.printPlaces || []), place],
