@@ -104,7 +104,47 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
     }).reduce((acc, item) => acc + item.quantity, 0);
   };
 
-  const processFile = (place: string, file: File) => {
+  const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(event.target?.result as string); // fallback
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const processFile = async (place: string, file: File) => {
     if (!file.type.startsWith('image/')) {
       setAlertMessage('Пожалуйста, загрузите изображение.');
       return;
@@ -112,29 +152,24 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
     
     setUploadingZones(prev => new Set(prev).add(place));
     
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
+    try {
+      // Compress image to max 800x800 with 0.7 quality to keep it well under 1MB
+      const base64 = await compressImage(file, 800, 800, 0.7);
       setFormData(prev => ({
         ...prev,
         printPlaces: prev.printPlaces?.includes(place) ? prev.printPlaces : [...(prev.printPlaces || []), place],
         printImages: { ...(prev.printImages || {}), [place]: base64 }
       }));
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      setAlertMessage('Ошибка при обработке изображения.');
+    } finally {
       setUploadingZones(prev => {
         const next = new Set(prev);
         next.delete(place);
         return next;
       });
-    };
-    reader.onerror = () => {
-      setUploadingZones(prev => {
-        const next = new Set(prev);
-        next.delete(place);
-        return next;
-      });
-      setAlertMessage('Ошибка при чтении файла.');
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleFileUpload = (place: string, e: React.ChangeEvent<HTMLInputElement>) => {

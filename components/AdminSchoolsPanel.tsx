@@ -45,6 +45,46 @@ export const AdminSchoolsPanel: React.FC = () => {
     }
   };
 
+  const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(event.target?.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleSave = async () => {
     if (!editingSchool?.name) return setAlertMessage(t('admin.enter_school_name'));
     
@@ -53,13 +93,8 @@ export const AdminSchoolsPanel: React.FC = () => {
 
     try {
       if (fileToUpload) {
-        // Convert file to base64 since we don't have Firebase Storage set up
-        finalLogoUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(fileToUpload);
-        });
+        // Compress image to max 400x400 with 0.8 quality to keep it small
+        finalLogoUrl = await compressImage(fileToUpload, 400, 400, 0.8);
       } else if (!finalLogoUrl) {
          setUploading(false);
          return setAlertMessage(t('admin.upload_logo_error'));

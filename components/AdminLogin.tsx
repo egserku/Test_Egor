@@ -29,9 +29,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
           await auth.signOut();
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Auth error:', err);
-      setError(t('admin.auth_error') || 'Ошибка авторизации.');
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(t('admin.unauthorized_domain') || 'Домен не авторизован в Firebase. Добавьте его в Authentication -> Settings -> Authorized domains.');
+      } else {
+        setError(`${t('admin.auth_error') || 'Ошибка авторизации.'} (${err.message || err.code || 'Unknown error'})`);
+      }
     } finally {
       setLoading(false);
     }
