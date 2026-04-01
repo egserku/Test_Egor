@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { School } from '../types';
-import { apiService } from '../services/apiService';
 import { Button } from './ui/Button';
 import { useTranslation } from 'react-i18next';
+import { apiService } from '../services/apiService';
 
 export const AdminSchoolsPanel: React.FC = () => {
   const { t } = useTranslation();
@@ -13,27 +13,27 @@ export const AdminSchoolsPanel: React.FC = () => {
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
 
   useEffect(() => {
-    fetchSchools();
+    const unsubscribe = apiService.subscribeToSchools((schoolsData) => {
+      setSchools(schoolsData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const fetchSchools = async () => {
+  const fetchSchools = () => {
+    // Real-time updates are handled by onSnapshot
     setLoading(true);
-    try {
-      const data = await apiService.getSchools();
-      setSchools(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => setLoading(false), 500);
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm(t('admin.delete_confirm'))) return;
     try {
       await apiService.deleteSchool(id);
-      setSchools(prev => prev.filter(s => s.id !== id));
+      // Local state is updated via subscription
     } catch (err) {
+      console.error("Delete school error:", err);
       alert(t('admin.delete_error'));
     }
   };
@@ -46,22 +46,29 @@ export const AdminSchoolsPanel: React.FC = () => {
 
     try {
       if (fileToUpload) {
-        finalLogoUrl = await apiService.uploadSchoolLogo(fileToUpload);
+        // Convert file to base64 since we don't have Firebase Storage set up
+        finalLogoUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(fileToUpload);
+        });
       } else if (!finalLogoUrl) {
          return alert(t('admin.upload_logo_error'));
       }
 
-      const savedResult = await apiService.saveSchool({ ...editingSchool, logo: finalLogoUrl });
+      const schoolData = {
+        ...editingSchool,
+        name: editingSchool.name,
+        logo: finalLogoUrl
+      };
       
-      if (editingSchool.id) {
-        setSchools(prev => prev.map(s => s.id === savedResult.id ? savedResult : s));
-      } else {
-        setSchools(prev => [...prev, savedResult]);
-      }
+      await apiService.saveSchool(schoolData);
       
       setEditingSchool(null);
       setFileToUpload(null);
     } catch (err) {
+      console.error("Save school error:", err);
       alert(t('admin.save_error'));
     } finally {
       setUploading(false);

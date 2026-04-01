@@ -1,162 +1,268 @@
 
-import axios from 'axios';
-import { Order, OrderItem } from '../types';
+import { db, collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, Timestamp, where, auth } from '../firebase';
+import { Order, OrderItem, School, InventoryItem } from '../types';
 
-// На продакшн-хостинге API работает на том же домене
-const API_URL = '/api';
-const LOCAL_STORAGE_KEY = 'printmaster_orders_backup';
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
 
-/**
- * Strips heavy base64 data from order items to prevent localStorage QuotaExceededError.
- * Local backup is primarily for text data; images are handled by the server.
- */
-const sanitizeOrderForStorage = (order: Order): Order => {
-  return {
-    ...order,
-    items: order.items.map(item => ({
-      ...item,
-      images: [], // Remove legacy images array
-      printImages: item.printImages ? Object.keys(item.printImages).reduce((acc, key) => {
-        acc[key] = "[Image Data Removed for Local Storage]";
-        return acc;
-      }, {} as Record<string, string>) : {}
-    }))
-  };
-};
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 export const apiService = {
   /**
-   * Simple login method
+   * Subscribe to real-time order updates
    */
-  login: async (password: string): Promise<boolean> => {
-    try {
-      const response = await axios.post(`${API_URL}/login`, { password }, { timeout: 5000 });
-      return response.data.success === true;
-    } catch (error) {
-      console.warn("Auth server unreachable or incorrect password.");
-      return false;
-    }
+  subscribeToOrders: (callback: (orders: Order[]) => void) => {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const ordersData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          orderNumber: doc.id,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt
+        } as Order;
+      });
+      callback(ordersData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'orders');
+    });
   },
 
+  /**
+   * Fetch all orders once (promise-based)
+   */
   getOrders: async (): Promise<Order[]> => {
-    let remoteOrders: Order[] = [];
     try {
-      const response = await axios.get(`${API_URL}/orders`, { timeout: 5000 });
-      remoteOrders = response.data;
+      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          orderNumber: doc.id,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt
+        } as Order;
+      });
     } catch (error) {
-      console.warn("Backend unreachable. Operating in Local Mode.");
-    }
-
-    const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-    const localOrders: Order[] = localData ? JSON.parse(localData) : [];
-
-    const orderMap = new Map<string, Order>();
-    remoteOrders.forEach(o => orderMap.set(o.orderNumber, o));
-    localOrders.forEach(o => orderMap.set(o.orderNumber, o));
-
-    return Array.from(orderMap.values()).sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  },
-
-  submitOrder: async (order: Order): Promise<void> => {
-    // 1. Attempt to sync with server FIRST with full data
-    try {
-      await axios.post(`${API_URL}/orders`, order, { timeout: 30000 });
-    } catch (error) {
-      console.warn("Server sync failed, order will be saved locally (without images).");
-    }
-
-    // 2. Save a lightweight version to localStorage to prevent QuotaExceededError
-    try {
-      const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-      const localOrders: Order[] = localData ? JSON.parse(localData) : [];
-      
-      const sanitizedOrder = sanitizeOrderForStorage(order);
-      localOrders.push(sanitizedOrder);
-      
-      const trimmedOrders = localOrders.slice(-50);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(trimmedOrders));
-    } catch (storageError) {
-      console.error("Local storage backup failed entirely:", storageError);
-    }
-  },
-
-  updateOrder: async (orderNumber: string, data: Partial<Order>): Promise<Order> => {
-    const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-    let localOrders: Order[] = localData ? JSON.parse(localData) : [];
-    
-    let updatedOrder: Order | null = null;
-    localOrders = localOrders.map(o => {
-      if (o.orderNumber === orderNumber) {
-        updatedOrder = { ...o, ...data };
-        return updatedOrder;
-      }
-      return o;
-    });
-
-    if (updatedOrder) {
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localOrders));
-      } catch (e) {
-        console.warn("Failed to update localStorage due to quota.");
-      }
-    }
-
-    try {
-      const response = await axios.patch(`${API_URL}/orders/${orderNumber}`, data, { timeout: 5000 });
-      return response.data;
-    } catch (error) {
-      console.warn("Order updated locally, but server sync failed.");
-      if (!updatedOrder) throw new Error("Order not found in local storage.");
-      return updatedOrder;
-    }
-  },
-
-  getSchools: async (): Promise<any[]> => {
-    try {
-      const response = await axios.get(`${API_URL}/schools`, { timeout: 5000 });
-      return response.data;
-    } catch (e) {
-      console.warn("Failed to fetch schools from server");
-      return [];
-    }
-  },
-  
-  saveSchool: async (school: any): Promise<any> => {
-    const response = await axios.post(`${API_URL}/schools`, school);
-    return response.data.school;
-  },
-
-  deleteSchool: async (id: string): Promise<boolean> => {
-    const response = await axios.delete(`${API_URL}/schools/${id}`);
-    return response.data.success;
-  },
-
-  uploadSchoolLogo: async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('logo', file);
-    const response = await axios.post(`${API_URL}/upload-logo`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    return response.data.logoUrl;
-  },
-
-  getInventory: async (): Promise<any[]> => {
-    try {
-      const response = await axios.get(`${API_URL}/inventory`, { timeout: 5000 });
-      return response.data;
-    } catch(e) {
+      handleFirestoreError(error, OperationType.GET, 'orders');
       return [];
     }
   },
 
-  saveInventoryBulk: async (inventory: any[]): Promise<boolean> => {
+  /**
+   * Subscribe to real-time updates for a specific user's orders
+   */
+  subscribeToUserOrders: (uid: string, callback: (orders: Order[]) => void) => {
+    const q = query(collection(db, 'orders'), where('uid', '==', uid), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const ordersData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          orderNumber: doc.id,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt
+        } as Order;
+      });
+      callback(ordersData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'orders');
+    });
+  },
+
+  /**
+   * Submit a new order to Firestore
+   */
+  submitOrder: async (order: Order, uid: string): Promise<void> => {
     try {
-      await axios.post(`${API_URL}/inventory/bulk`, inventory);
-      return true;
-    } catch(e) {
-      return false;
+      const orderRef = doc(collection(db, 'orders'), order.orderNumber);
+      await setDoc(orderRef, {
+        ...order,
+        uid,
+        createdAt: Timestamp.now(), // Use Firestore Timestamp for server-side time
+        status: 'New'
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `orders/${order.orderNumber}`);
+    }
+  },
+
+  /**
+   * Update an existing order
+   */
+  updateOrder: async (orderNumber: string, data: Partial<Order>): Promise<void> => {
+    try {
+      const orderRef = doc(db, 'orders', orderNumber);
+      await updateDoc(orderRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `orders/${orderNumber}`);
+    }
+  },
+
+  /**
+   * Subscribe to real-time school updates
+   */
+  subscribeToSchools: (callback: (schools: School[]) => void) => {
+    return onSnapshot(collection(db, 'schools'), (snapshot) => {
+      const schoolsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as School));
+      callback(schoolsData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'schools');
+    });
+  },
+
+  /**
+   * Fetch all schools once (promise-based)
+   */
+  getSchools: async (): Promise<School[]> => {
+    try {
+      const snapshot = await getDocs(collection(db, 'schools'));
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as School));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'schools');
+      return [];
+    }
+  },
+
+  /**
+   * Save or update a school
+   */
+  saveSchool: async (school: Partial<School>): Promise<void> => {
+    try {
+      const schoolId = school.id || Date.now().toString();
+      const schoolRef = doc(db, 'schools', schoolId);
+      const { id, ...data } = school;
+      await setDoc(schoolRef, data, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `schools/${school.id}`);
+    }
+  },
+
+  /**
+   * Delete a school
+   */
+  deleteSchool: async (id: string): Promise<void> => {
+    try {
+      await deleteDoc(doc(db, 'schools', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `schools/${id}`);
+    }
+  },
+
+  /**
+   * Subscribe to real-time inventory updates
+   */
+  subscribeToInventory: (callback: (inventory: InventoryItem[]) => void) => {
+    return onSnapshot(collection(db, 'inventory'), (snapshot) => {
+      const inventoryData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as InventoryItem));
+      callback(inventoryData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'inventory');
+    });
+  },
+
+  /**
+   * Fetch all inventory once (promise-based)
+   */
+  getInventory: async (): Promise<InventoryItem[]> => {
+    try {
+      const snapshot = await getDocs(collection(db, 'inventory'));
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as InventoryItem));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'inventory');
+      return [];
+    }
+  },
+
+  /**
+   * Update inventory item quantity
+   */
+  updateInventoryQty: async (id: string, newQty: number): Promise<void> => {
+    try {
+      const itemRef = doc(db, 'inventory', id);
+      await updateDoc(itemRef, { quantity: newQty });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `inventory/${id}`);
+    }
+  },
+
+  /**
+   * Add a new inventory item
+   */
+  addInventoryItem: async (item: InventoryItem): Promise<void> => {
+    try {
+      const { id, ...data } = item;
+      await setDoc(doc(db, 'inventory', id), data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `inventory/${item.id}`);
+    }
+  },
+
+  /**
+   * Delete an inventory item
+   */
+  deleteInventoryItem: async (id: string): Promise<void> => {
+    try {
+      await deleteDoc(doc(db, 'inventory', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `inventory/${id}`);
     }
   }
 };

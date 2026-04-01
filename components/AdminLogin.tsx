@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from './ui/Button';
-import { apiService } from '../services/apiService';
+import { auth, googleProvider, signInWithPopup } from '../firebase';
 import { useTranslation } from 'react-i18next';
 
 interface AdminLoginProps {
@@ -10,25 +10,28 @@ interface AdminLoginProps {
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
   const { t } = useTranslation();
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
 
     try {
-      const success = await apiService.login(password);
-      if (success) {
-        sessionStorage.setItem('isAdminAuthenticated', 'true');
-        onLoginSuccess();
-      } else {
-        setError(t('admin.invalid_password'));
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user) {
+        // Admin check is done via Security Rules, but we can also check email here for UI
+        if (result.user.email === 'egserku@gmail.com') {
+          sessionStorage.setItem('isAdminAuthenticated', 'true');
+          onLoginSuccess();
+        } else {
+          setError(t('admin.not_authorized') || 'У вас нет прав администратора.');
+          await auth.signOut();
+        }
       }
     } catch (err) {
-      setError(t('admin.auth_error'));
+      console.error('Auth error:', err);
+      setError(t('admin.auth_error') || 'Ошибка авторизации.');
     } finally {
       setLoading(false);
     }
@@ -43,33 +46,27 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
           <p className="text-gray-500 text-sm mt-2">{t('admin.login_subtitle')}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">{t('admin.password')}</label>
-            <input 
-              type="password" 
-              className={`w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:ring-2 ring-indigo-400 transition-all ${error ? 'border-red-400' : 'border-gray-200'}`}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoFocus
-            />
-            {error && <p className="text-red-500 text-xs mt-2 ml-1 font-medium">{error}</p>}
-          </div>
-
+        <div className="space-y-6">
           <Button 
             variant="primary" 
             fullWidth 
-            type="submit" 
-            disabled={loading || !password}
+            onClick={handleGoogleLogin}
+            disabled={loading}
           >
-            {loading ? t('admin.checking') : t('admin.login')}
+            {loading ? t('admin.checking') : (
+              <div className="flex items-center justify-center gap-2">
+                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                {t('admin.login_google') || 'Войти через Google'}
+              </div>
+            )}
           </Button>
+
+          {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
 
           <p className="text-center text-[10px] text-gray-400 uppercase tracking-widest">
             PrintMaster Pro Security
           </p>
-        </form>
+        </div>
       </div>
     </div>
   );

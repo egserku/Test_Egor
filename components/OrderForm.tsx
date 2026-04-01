@@ -4,7 +4,7 @@ import {
   ProductType, OrderSubtype, OrderItem, HoodieType, CapType,
 } from '../types';
 import { 
-  COLORS, SCHOOL_LIST, PRINT_PLACES, SLEEVES,
+  COLORS, PRINT_PLACES, SLEEVES,
   SCHOOL_SIZES_KIDS, SCHOOL_SIZES_ADULTS,
   PERSONAL_SIZES_KIDS, PERSONAL_SIZES_ADULTS
 } from '../constants';
@@ -225,16 +225,18 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
       </div>
 
       <div className="space-y-10">
-        <div className="animate-in fade-in duration-700">
-          <ProductPreview 
-            key={`${productType}-${formData.color}`}
-            productType={productType}
-            color={formData.color || COLORS[0].name}
-            hoodieType={formData.hoodieType}
-            printImages={formData.printImages || {}}
-            gender={formData.gender}
-          />
-        </div>
+        {initialSubtype !== OrderSubtype.SCHOOL && (
+          <div className="animate-in fade-in duration-700">
+            <ProductPreview 
+              key={`${productType}-${formData.color}`}
+              productType={productType}
+              color={formData.color || COLORS[0].name}
+              hoodieType={formData.hoodieType}
+              printImages={formData.printImages || {}}
+              gender={formData.gender}
+            />
+          </div>
+        )}
 
         {tips && (
           <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6">

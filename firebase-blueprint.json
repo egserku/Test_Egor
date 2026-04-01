@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "A customer order for a product.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The user ID of the customer." },
+        "productType": { "type": "string", "enum": ["T-shirt", "Hoodie", "Tank Top", "Cap"], "description": "The type of product ordered." },
+        "orderSubtype": { "type": "string", "enum": ["School", "Team", "Personal"], "description": "The subtype of the order." },
+        "color": { "type": "string", "description": "The color of the product." },
+        "size": { "type": "string", "description": "The size of the product." },
+        "gender": { "type": "string", "enum": ["Мальчик", "Девочка"], "description": "The gender for the product." },
+        "sleeve": { "type": "string", "description": "The sleeve length." },
+        "fabric": { "type": "string", "description": "The fabric type." },
+        "school": { "type": "string", "description": "The school name if applicable." },
+        "capType": { "type": "string", "description": "The cap type if applicable." },
+        "printImages": {
+          "type": "object",
+          "properties": {
+            "Спереди": { "type": "string" },
+            "Сзади": { "type": "string" },
+            "Левый рукав": { "type": "string" },
+            "Правый рукав": { "type": "string" }
+          }
+        },
+        "status": { "type": "string", "enum": ["Новый", "В работе", "Готов", "Отправлен"], "description": "The current status of the order." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "The time the order was created." }
+      },
+      "required": ["uid", "productType", "orderSubtype", "color", "size", "status", "createdAt"]
+    },
+    "School": {
+      "title": "School",
+      "description": "A school in the system.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the school." },
+        "logo": { "type": "string", "description": "The URL of the school's logo." }
+      },
+      "required": ["name", "logo"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "An item in the inventory.",
+      "type": "object",
+      "properties": {
+        "productType": { "type": "string", "enum": ["TSHIRT", "HOODIE", "TANK_TOP", "CAP"], "description": "The type of product." },
+        "color": { "type": "string", "description": "The color of the product." },
+        "size": { "type": "string", "description": "The size of the product." },
+        "quantity": { "type": "number", "description": "The quantity in stock." },
+        "sleeve": { "type": "string", "description": "The sleeve length." },
+        "fabric": { "type": "string", "description": "The fabric type." }
+      },
+      "required": ["productType", "color", "size", "quantity"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of customer orders."
+    },
+    "/schools/{schoolId}": {
+      "schema": "School",
+      "description": "Collection of schools and their logos."
+    },
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Collection of inventory items."
+    }
+  }
+}

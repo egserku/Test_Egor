@@ -19,25 +19,37 @@ export const ProductPreview: React.FC<ProductPreviewProps> = ({
   gender 
 }) => {
   // Extremely robust color matching
-  const normalize = (s: string) => (s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-z0-9а-яе]/gi, '').trim();
-  const target = normalize(color);
-  const isHex = /^#[0-9A-F]{6}$/i.test(color);
-  
-  const selectedColor = isHex ? { name: color, hex: color } : (
-    COLORS.find(c => normalize(c.name) === target) || 
-    COLORS.find(c => normalize(c.name).includes(target) || target.includes(normalize(c.name))) ||
-    COLORS.find(c => target.includes(normalize(c.name))) ||
-    COLORS.find(c => c.hex.toLowerCase() === (color || '').toLowerCase()) ||
-    COLORS[0]
-  );
+  const selectedColor = React.useMemo(() => {
+    const input = (color || '').trim();
+    if (!input) return COLORS[0];
 
-  const normalizedSelectedName = normalize(selectedColor.name);
-  const isDarkColor = ['#000000', '#001F3F', '#004D00'].includes(selectedColor.hex.toUpperCase()) || 
-                      normalizedSelectedName.includes('черный') || 
-                      normalizedSelectedName.includes('темносиний') || 
-                      normalizedSelectedName.includes('navy');
+    // 1. Try exact match by name or hex
+    const exact = COLORS.find(c => c.name === input || c.hex.toLowerCase() === input.toLowerCase());
+    if (exact) return exact;
+
+    // 2. Try normalized match
+    const normalize = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/[^a-z0-9а-яе]/gi, '').trim();
+    const target = normalize(input);
+    const normalized = COLORS.find(c => normalize(c.name) === target);
+    if (normalized) return normalized;
+
+    // 3. Try partial match
+    const partial = COLORS.find(c => normalize(c.name).includes(target) || target.includes(normalize(c.name)));
+    if (partial) return partial;
+
+    return COLORS[0];
+  }, [color]);
+
+  const hex = selectedColor.hex.toUpperCase();
+  const isBlack = hex === '#000000';
+  const isNavy = hex === '#001F3F' || hex === '#001A35';
+  const isDark = isBlack || isNavy || hex === '#004D00';
   
-  const isTurquoise = selectedColor.hex.toUpperCase() === '#40E0D0' || normalizedSelectedName.includes('бирюзовый');
+  const isTurquoise = hex === '#40E0D0';
+
+  // Mockup color: slightly lighter for black/navy to show details (folds, shadows)
+  // If we use pure #000000, it's just a black blob.
+  const mockupFill = isBlack ? '#1C1C1C' : (isNavy ? '#002B59' : selectedColor.hex);
 
   // Simple SVG-based hoodie/t-shirt mockup
   const renderMockup = (side: 'front' | 'back') => {
@@ -55,14 +67,24 @@ export const ProductPreview: React.FC<ProductPreviewProps> = ({
     const printTopClass = isCap ? 'top-[45%]' : (side === 'front' ? 'top-[38%]' : 'top-[35%]');
 
     return (
-      <div className="relative w-full aspect-[4/5] bg-gray-100 rounded-3xl overflow-hidden flex items-center justify-center p-4 border border-gray-200 shadow-inner">
+      <div className="relative w-full aspect-[4/5] bg-gray-50 rounded-3xl overflow-hidden flex items-center justify-center p-4 border border-gray-200 shadow-inner group">
         <div className="absolute inset-0 flex items-center justify-center">
           <svg 
             viewBox="0 0 100 100" 
             className="w-full h-full drop-shadow-2xl transition-all duration-500"
           >
+            <defs>
+              <radialGradient id={`lighting-${side}`} cx="50%" cy="40%" r="50%" fx="50%" fy="40%">
+                <stop offset="0%" stopColor="white" stopOpacity={isDark ? "0.25" : "0.4"} />
+                <stop offset="100%" stopColor="black" stopOpacity="0.2" />
+              </radialGradient>
+              <filter id="shadow">
+                <feDropShadow dx="0" dy="1" stdDeviation="1" floodOpacity="0.2" />
+              </filter>
+            </defs>
+
             {/* Base Hoodie/T-shirt path with shading */}
-            <g fill={selectedColor.hex} stroke={isDarkColor ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"} strokeWidth="0.5">
+            <g fill={mockupFill} stroke={isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.15)"} strokeWidth="0.8">
               {isHoodie && (
                 <path d="M20,35 Q20,25 35,20 L65,20 Q80,25 80,35 L85,60 Q85,65 75,65 L70,90 Q70,95 30,90 L25,65 Q15,65 15,60 Z" />
               )}
@@ -76,33 +98,41 @@ export const ProductPreview: React.FC<ProductPreviewProps> = ({
                 <path d="M25,60 Q25,30 50,30 Q75,30 75,60 L75,70 L25,70 Z M25,70 L75,70 L85,80 Q85,85 50,85 Q15,85 15,80 Z" />
               )}
             </g>
+
+            {/* Lighting Overlay */}
+            <g style={{ mixBlendMode: 'overlay', pointerEvents: 'none' }}>
+               {isHoodie && <path d="M20,35 Q20,25 35,20 L65,20 Q80,25 80,35 L85,60 Q85,65 75,65 L70,90 Q70,95 30,90 L25,65 Q15,65 15,60 Z" fill={`url(#lighting-${side})`} />}
+               {isTshirt && <path d="M20,30 L35,20 L65,20 L80,30 L85,50 L75,55 L75,90 L25,90 L25,55 L15,50 Z" fill={`url(#lighting-${side})`} />}
+               {isTankTop && <path d="M30,20 L70,20 L75,40 L70,90 L30,90 L25,40 Z" fill={`url(#lighting-${side})`} />}
+               {isCap && <path d="M25,60 Q25,30 50,30 Q75,30 75,60 L75,70 L25,70 Z" fill={`url(#lighting-${side})`} />}
+            </g>
             
             {/* Shading/Highlights */}
-            {!isCap && <path d="M20,35 Q20,25 35,20 L65,20 Q80,25 80,35" fill="none" stroke={isDarkColor ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"} strokeWidth="1" />}
-            {!isCap && <path d="M30,90 L70,90" fill="none" stroke={isDarkColor ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} strokeWidth="2" />}
+            {!isCap && <path d="M20,35 Q20,25 35,20 L65,20 Q80,25 80,35" fill="none" stroke={isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.1)"} strokeWidth="1" />}
+            {!isCap && <path d="M30,90 L70,90" fill="none" stroke={isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.15)"} strokeWidth="2" />}
             
             {/* Hoodie specific details */}
             {isHoodie && (
               <>
-                <path d="M40,20 Q50,40 60,20" fill="none" stroke={isDarkColor ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} strokeWidth="1" />
-                <path d="M35,65 L65,65 Q65,85 50,85 Q35,85 35,65" fill="none" stroke={isDarkColor ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} strokeWidth="1" /> {/* Pocket */}
+                <path d="M40,20 Q50,40 60,20" fill="none" stroke={isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"} strokeWidth="1" />
+                <path d="M35,65 L65,65 Q65,85 50,85 Q35,85 35,65" fill="none" stroke={isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"} strokeWidth="1" /> {/* Pocket */}
               </>
             )}
 
             {/* Cap specific details */}
             {isCap && (
-              <path d="M50,30 L50,70" fill="none" stroke={isDarkColor ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} strokeWidth="0.5" />
+              <path d="M50,30 L50,70" fill="none" stroke={isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"} strokeWidth="0.5" />
             )}
           </svg>
         </div>
 
-        {/* Print Overlay with perspective-like scaling */}
+        {/* Print Overlay */}
         {printImage && (
           <div className={`absolute left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none ${isCap ? 'w-[20%]' : 'w-[35%] aspect-square'} ${printTopClass}`}>
             <img 
               src={printImage} 
               alt="Print" 
-              className={`max-w-full max-h-full object-contain opacity-90 ${isDarkColor || isTurquoise ? 'mix-blend-normal' : 'mix-blend-multiply'}`}
+              className="max-w-full max-h-full object-contain opacity-95 mix-blend-normal drop-shadow-xl"
               referrerPolicy="no-referrer"
             />
           </div>

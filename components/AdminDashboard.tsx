@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Order, OrderStatus, ProductType, OrderSubtype, OrderItem } from '../types';
 import { Button } from './ui/Button';
-import { apiService } from '../services/apiService';
 import { AdminSchoolsPanel } from './AdminSchoolsPanel';
 import { AdminInventoryPanel } from './AdminInventoryPanel';
 import { useTranslation } from 'react-i18next';
+import { apiService } from '../services/apiService';
 
 type SortField = 'date' | 'customer' | 'status';
 
@@ -38,37 +38,36 @@ export const AdminDashboard: React.FC = () => {
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   useEffect(() => {
-    fetchOrders();
+    const unsubscribe = apiService.subscribeToOrders((ordersData) => {
+      setOrders(ordersData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (selectedOrder) {
-      setEditingNotes(selectedOrder.internalNotes || '');
+      const currentOrder = orders.find(o => o.orderNumber === selectedOrder.orderNumber);
+      if (currentOrder) {
+        setSelectedOrder(currentOrder);
+        setEditingNotes(currentOrder.internalNotes || '');
+      }
     }
-  }, [selectedOrder]);
+  }, [orders]);
 
-  const fetchOrders = async () => {
+  const fetchOrders = () => {
+    // Real-time updates are handled by onSnapshot in useEffect
     setLoading(true);
-    try {
-      const data = await apiService.getOrders();
-      setOrders(data);
-    } catch (error) {
-      console.error("Dashboard fetch error:", error);
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => setLoading(false), 500);
   };
 
   const updateOrderData = async (orderNumber: string, data: Partial<Order>) => {
     try {
-      const updated = await apiService.updateOrder(orderNumber, data);
-      setOrders(prev => prev.map(o => o.orderNumber === orderNumber ? { ...o, ...data } : o));
-      if (selectedOrder?.orderNumber === orderNumber) {
-        setSelectedOrder({ ...selectedOrder, ...data });
-      }
-      return updated;
+      await apiService.updateOrder(orderNumber, data);
+      // Local state is updated via subscription
     } catch (error) {
-      console.error("Dashboard update error:", error);
+      console.error("Update error:", error);
       throw error;
     }
   };
@@ -78,16 +77,11 @@ export const AdminDashboard: React.FC = () => {
     setIsBulkUpdating(true);
     
     try {
-      const promises = Array.from(selectedOrderIds).map(id => 
-        apiService.updateOrder(id, { status: newStatus, viewed: true })
-      );
+      const promises = Array.from(selectedOrderIds).map(id => {
+        return apiService.updateOrder(id, { status: newStatus, viewed: true });
+      });
       
       await Promise.all(promises);
-      
-      setOrders(prev => prev.map(o => 
-        selectedOrderIds.has(o.orderNumber) ? { ...o, status: newStatus, viewed: true } : o
-      ));
-      
       setSelectedOrderIds(new Set());
       alert(t('admin.bulk_confirm', { count: selectedOrderIds.size }));
     } catch (error) {
