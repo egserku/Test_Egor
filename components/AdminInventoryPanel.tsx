@@ -29,6 +29,8 @@ export const AdminInventoryPanel: React.FC = () => {
     sizeSet: 'adults' as 'adults' | 'kids'
   });
   const [matrixData, setMatrixData] = useState<Record<string, Record<string, number>>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = apiService.subscribeToInventory((inventoryData) => {
@@ -98,10 +100,10 @@ export const AdminInventoryPanel: React.FC = () => {
       }
       
       await Promise.all(updates);
-      alert(t('admin.save_confirm'));
+      setAlertMessage(t('admin.save_confirm'));
     } catch (error) {
       console.error("Matrix save error:", error);
-      alert(t('admin.save_error'));
+      setAlertMessage(t('admin.save_error'));
     } finally {
       setIsSaving(false);
     }
@@ -122,23 +124,29 @@ export const AdminInventoryPanel: React.FC = () => {
       await apiService.updateInventoryQty(id, newQty);
     } catch (error) {
       console.error("Inventory update error:", error);
-      alert(t('admin.save_error'));
+      setAlertMessage(t('admin.save_error'));
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if(!window.confirm(t('admin.pos_delete_confirm'))) return;
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmId) return;
     try {
-      await apiService.deleteInventoryItem(id);
+      await apiService.deleteInventoryItem(deleteConfirmId);
+      setDeleteConfirmId(null);
     } catch (error) {
       console.error("Inventory delete error:", error);
-      alert(t('admin.delete_error'));
+      setAlertMessage(t('admin.delete_error'));
+      setDeleteConfirmId(null);
     }
   };
 
   const handleAdd = async () => {
     if (!newItem.productType || !newItem.color || !newItem.size) {
-      alert(t('admin.fill_all_fields'));
+      setAlertMessage(t('admin.fill_all_fields'));
       return;
     }    
     const exists = inventory.find(i =>
@@ -150,7 +158,7 @@ export const AdminInventoryPanel: React.FC = () => {
     );
     
     if (exists) {
-      alert(t('admin.item_exists_error'));
+      setAlertMessage(t('admin.item_exists_error'));
       return;
     }
 
@@ -177,7 +185,7 @@ export const AdminInventoryPanel: React.FC = () => {
       });
     } catch (error) {
       console.error("Inventory add error:", error);
-      alert(t('admin.save_error'));
+      setAlertMessage(t('admin.save_error'));
     } finally {
       setIsSaving(false);
     }
@@ -535,6 +543,37 @@ export const AdminInventoryPanel: React.FC = () => {
         </div>
       )}
     </>
+  )}
+
+  {/* Alert Modal */}
+  {alertMessage && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">{t('admin.notification')}</h3>
+        <p className="text-gray-600 mb-6">{alertMessage}</p>
+        <Button onClick={() => setAlertMessage(null)} className="w-full">
+          {t('admin.ok', 'OK')}
+        </Button>
+      </div>
+    </div>
+  )}
+
+  {/* Delete Confirmation Modal */}
+  {deleteConfirmId && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">{t('admin.confirm_delete', 'Confirm Deletion')}</h3>
+        <p className="text-gray-600 mb-6">{t('admin.pos_delete_confirm')}</p>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="flex-1">
+            {t('admin.cancel', 'Cancel')}
+          </Button>
+          <Button onClick={confirmDelete} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+            {t('admin.delete', 'Delete')}
+          </Button>
+        </div>
+      </div>
+    </div>
   )}
 </div>
 );

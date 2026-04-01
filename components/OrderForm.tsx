@@ -44,6 +44,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
   
   const [uploadingZones, setUploadingZones] = useState<Set<string>>(new Set());
   const [dragOverZone, setDragOverZone] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [multiColorSelections, setMultiColorSelections] = useState<Record<string, number>>({});
   const [multiSizeSelections, setMultiSizeSelections] = useState<Record<string, number>>({});
   const [tips, setTips] = useState<string | null>(null);
@@ -105,7 +106,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
 
   const processFile = (place: string, file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Пожалуйста, загрузите изображение.');
+      setAlertMessage('Пожалуйста, загрузите изображение.');
       return;
     }
     
@@ -131,7 +132,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
         next.delete(place);
         return next;
       });
-      alert('Ошибка при чтении файла.');
+      setAlertMessage('Ошибка при чтении файла.');
     };
     reader.readAsDataURL(file);
   };
@@ -562,6 +563,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
           {formData.id ? t('order_form.update_data') : t('order_form.add_to_cart')}
         </Button>
       </div>
+
+      {/* Alert Modal */}
+      {alertMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">{t('admin.notification', 'Notification')}</h3>
+            <p className="text-gray-600 mb-6">{alertMessage}</p>
+            <Button onClick={() => setAlertMessage(null)} className="w-full">
+              {t('admin.ok', 'OK')}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

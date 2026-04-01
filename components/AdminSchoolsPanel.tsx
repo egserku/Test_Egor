@@ -11,6 +11,8 @@ export const AdminSchoolsPanel: React.FC = () => {
   const [editingSchool, setEditingSchool] = useState<Partial<School> | null>(null);
   const [uploading, setUploading] = useState(false);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = apiService.subscribeToSchools((schoolsData) => {
@@ -27,19 +29,24 @@ export const AdminSchoolsPanel: React.FC = () => {
     setTimeout(() => setLoading(false), 500);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm(t('admin.delete_confirm'))) return;
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmId) return;
     try {
-      await apiService.deleteSchool(id);
-      // Local state is updated via subscription
+      await apiService.deleteSchool(deleteConfirmId);
+      setDeleteConfirmId(null);
     } catch (err) {
       console.error("Delete school error:", err);
-      alert(t('admin.delete_error'));
+      setAlertMessage(t('admin.delete_error'));
+      setDeleteConfirmId(null);
     }
   };
 
   const handleSave = async () => {
-    if (!editingSchool?.name) return alert(t('admin.enter_school_name'));
+    if (!editingSchool?.name) return setAlertMessage(t('admin.enter_school_name'));
     
     setUploading(true);
     let finalLogoUrl = editingSchool.logo || '';
@@ -54,7 +61,8 @@ export const AdminSchoolsPanel: React.FC = () => {
           reader.readAsDataURL(fileToUpload);
         });
       } else if (!finalLogoUrl) {
-         return alert(t('admin.upload_logo_error'));
+         setUploading(false);
+         return setAlertMessage(t('admin.upload_logo_error'));
       }
 
       const schoolData = {
@@ -69,7 +77,7 @@ export const AdminSchoolsPanel: React.FC = () => {
       setFileToUpload(null);
     } catch (err) {
       console.error("Save school error:", err);
-      alert(t('admin.save_error'));
+      setAlertMessage(t('admin.save_error'));
     } finally {
       setUploading(false);
     }
@@ -149,6 +157,37 @@ export const AdminSchoolsPanel: React.FC = () => {
             </div>
           ))}
           {schools.length === 0 && <p className="col-span-full py-8 text-center text-gray-500">{t('admin.no_schools')}</p>}
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {alertMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">{t('admin.notification')}</h3>
+            <p className="text-gray-600 mb-6">{alertMessage}</p>
+            <Button onClick={() => setAlertMessage(null)} className="w-full">
+              {t('admin.ok', 'OK')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">{t('admin.confirm_delete', 'Confirm Deletion')}</h3>
+            <p className="text-gray-600 mb-6">{t('admin.delete_confirm')}</p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="flex-1">
+                {t('admin.cancel', 'Cancel')}
+              </Button>
+              <Button onClick={confirmDelete} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+                {t('admin.delete', 'Delete')}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

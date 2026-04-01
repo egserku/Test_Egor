@@ -36,6 +36,7 @@ export const AdminDashboard: React.FC = () => {
   // Bulk selection state
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = apiService.subscribeToOrders((ordersData) => {
@@ -82,11 +83,11 @@ export const AdminDashboard: React.FC = () => {
       });
       
       await Promise.all(promises);
+      setAlertMessage(t('admin.bulk_confirm', { count: selectedOrderIds.size }));
       setSelectedOrderIds(new Set());
-      alert(t('admin.bulk_confirm', { count: selectedOrderIds.size }));
     } catch (error) {
       console.error("Bulk update error:", error);
-      alert(t('admin.bulk_error'));
+      setAlertMessage(t('admin.bulk_error'));
     } finally {
       setIsBulkUpdating(false);
     }
@@ -658,6 +659,19 @@ export const AdminDashboard: React.FC = () => {
                 </select>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {alertMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">{t('admin.notification')}</h3>
+            <p className="text-gray-600 mb-6">{alertMessage}</p>
+            <Button onClick={() => setAlertMessage(null)} className="w-full">
+              {t('admin.ok', 'OK')}
+            </Button>
           </div>
         </div>
       )}
