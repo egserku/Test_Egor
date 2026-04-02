@@ -513,7 +513,7 @@ export const AdminDashboard: React.FC = () => {
                               <div className="flex flex-wrap gap-2 mt-2">
                                 <span className="px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold text-gray-600 uppercase">{item.color}</span>
                                 {item.fabric && <span className="px-2 py-1 bg-amber-100 rounded-md text-[10px] font-bold text-amber-700 uppercase">{t('order_form.fabric_choice')}: {item.fabric}</span>}
-                                {!isTeamItem && <span className="px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold text-gray-600 uppercase">{t('order_form.sizes').split(' ')[0]}: {item.size}</span>}
+                                {!isTeamItem && <span className="px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold text-gray-600 uppercase">{t('order_form.sizes').split(' ')[0]}: {item.sizes ? Object.entries(item.sizes).map(([s, q]) => `${s}(${q})`).join(', ') : item.size}</span>}
                                 <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${isTeamItem ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'}`}>
                                   {isTeamItem ? `${t('admin.composition')}: ${playersList.length || item.quantity}` : `${t('order.quantity')}: ${item.quantity} ${t('order.pcs')}`}
                                 </span>

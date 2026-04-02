@@ -39,7 +39,7 @@ export const CartView: React.FC<CartViewProps> = ({ items, onRemove, onNext }) =
               <div>
                 <p className="font-bold text-gray-800">{t(`categories.${item.subtype.toLowerCase() === 'школа' ? 'school' : item.subtype.toLowerCase() === 'команда' ? 'team' : 'personal'}`)} - {t(`products.${item.type.toLowerCase().replace('-', '_')}`)}</p>
                 <p className="text-xs text-gray-500 uppercase font-semibold">
-                  {item.color} • {item.size} • x{item.quantity} 
+                  {item.color} • {item.sizes ? Object.entries(item.sizes).map(([s, q]) => `${s}(${q})`).join(', ') : item.size} • x{item.quantity} 
                   {item.fabric && ` • ${item.fabric}`}
                   {item.school && ` • ${item.school}`}
                   {item.players && ` • ${t('categories.team')} (${item.players.length})`}

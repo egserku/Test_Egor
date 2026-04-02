@@ -51,6 +51,7 @@ export interface OrderItem {
   size: string;
   color: string;
   quantity: number;
+  sizes?: Record<string, number>; // Map of size -> quantity for multi-size orders
   fabric?: string;
   wishes?: string;
 }

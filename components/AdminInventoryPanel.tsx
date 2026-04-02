@@ -33,6 +33,32 @@ export const AdminInventoryPanel: React.FC = () => {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    // Update defaults when product type changes
+    if (newItem.productType === ProductType.HOODIE) {
+      setNewItem(prev => ({ ...prev, sleeve: 'Длинный', fabric: 'Флис' }));
+    } else if (newItem.productType === ProductType.TANK_TOP) {
+      setNewItem(prev => ({ ...prev, sleeve: 'Без рукавов', fabric: '100% хлопок' }));
+    } else if (newItem.productType === ProductType.CAP) {
+      setNewItem(prev => ({ ...prev, sleeve: undefined, fabric: undefined }));
+    } else if (newItem.productType === ProductType.TSHIRT) {
+      setNewItem(prev => ({ ...prev, sleeve: 'Короткий', fabric: '100% хлопок' }));
+    }
+  }, [newItem.productType]);
+
+  useEffect(() => {
+    // Update matrix config defaults when product type changes
+    if (matrixConfig.productType === ProductType.HOODIE) {
+      setMatrixConfig(prev => ({ ...prev, sleeve: 'Длинный', fabric: 'Флис' }));
+    } else if (matrixConfig.productType === ProductType.TANK_TOP) {
+      setMatrixConfig(prev => ({ ...prev, sleeve: 'Без рукавов', fabric: '100% хлопок' }));
+    } else if (matrixConfig.productType === ProductType.CAP) {
+      setMatrixConfig(prev => ({ ...prev, sleeve: undefined, fabric: undefined }));
+    } else if (matrixConfig.productType === ProductType.TSHIRT) {
+      setMatrixConfig(prev => ({ ...prev, sleeve: 'Короткий', fabric: '100% хлопок' }));
+    }
+  }, [matrixConfig.productType]);
+
+  useEffect(() => {
     const unsubscribe = apiService.subscribeToInventory((inventoryData) => {
       setInventory(inventoryData);
       setLoading(false);

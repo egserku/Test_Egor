@@ -86,8 +86,15 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
     if (!inventory.length) return null;
     return inventory.filter(i => {
       if (i.productType !== productType || i.color !== formData.color || i.size !== sizeName) return false;
-      if (i.sleeve && formData.sleeve && i.sleeve !== formData.sleeve) return false;
-      if (i.fabric && formData.fabric && i.fabric !== formData.fabric) return false;
+      
+      // Only check sleeve if the product type actually uses it as a variable option
+      const usesSleeve = productType === ProductType.TSHIRT;
+      if (usesSleeve && i.sleeve && formData.sleeve && i.sleeve !== formData.sleeve) return false;
+      
+      // Only check fabric if the product type actually uses it as a variable option
+      const usesFabric = productType === ProductType.TSHIRT || productType === ProductType.TANK_TOP;
+      if (usesFabric && i.fabric && formData.fabric && i.fabric !== formData.fabric) return false;
+      
       return true;
     }).reduce((acc, item) => acc + item.quantity, 0);
   };
@@ -98,8 +105,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
       if (i.productType !== productType || i.color !== colorName) return false;
       // Filter by size if one is selected, to keep it consistent with the size grid
       if (formData.size && i.size !== formData.size) return false;
-      if (i.sleeve && formData.sleeve && i.sleeve !== formData.sleeve) return false;
-      if (i.fabric && formData.fabric && i.fabric !== formData.fabric) return false;
+      
+      const usesSleeve = productType === ProductType.TSHIRT;
+      if (usesSleeve && i.sleeve && formData.sleeve && i.sleeve !== formData.sleeve) return false;
+      
+      const usesFabric = productType === ProductType.TSHIRT || productType === ProductType.TANK_TOP;
+      if (usesFabric && i.fabric && formData.fabric && i.fabric !== formData.fabric) return false;
+      
       return true;
     }).reduce((acc, item) => acc + item.quantity, 0);
   };

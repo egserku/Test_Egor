@@ -94,7 +94,7 @@ export const UserDashboard: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         <span className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-[10px] font-bold">{item.quantity}</span>
                         <span>{t(`products.${item.type.toLowerCase().replace('-', '_')}`)}</span>
                         <span className="text-gray-300">•</span>
-                        <span className="text-gray-500">{item.color}, {item.size}</span>
+                        <span className="text-gray-500">{item.color}, {item.sizes ? Object.entries(item.sizes).map(([s, q]) => `${s}(${q})`).join(', ') : item.size}</span>
                       </div>
                     ))}
                   </div>
