@@ -39,7 +39,10 @@ export const CartView: React.FC<CartViewProps> = ({ items, onRemove, onNext }) =
               <div>
                 <p className="font-bold text-gray-800">{t(`categories.${item.subtype.toLowerCase() === 'школа' ? 'school' : item.subtype.toLowerCase() === 'команда' ? 'team' : 'personal'}`)} - {t(`products.${item.type.toLowerCase().replace('-', '_')}`)}</p>
                 <p className="text-xs text-gray-500 uppercase font-semibold">
-                  {item.color} • {item.sizes ? Object.entries(item.sizes).map(([s, q]) => `${s}(${q})`).join(', ') : item.size} • x{item.quantity} 
+                  {item.color} 
+                  {item.size && ` • ${item.size}`}
+                  {item.quantity && ` • x${item.quantity}`}
+                  {item.multiSize && ` • ${Object.entries(item.multiSize).map(([s, q]) => `${s}(${q})`).join(', ')}`}
                   {item.fabric && ` • ${item.fabric}`}
                   {item.school && ` • ${item.school}`}
                   {item.players && ` • ${t('categories.team')} (${item.players.length})`}
@@ -59,7 +62,11 @@ export const CartView: React.FC<CartViewProps> = ({ items, onRemove, onNext }) =
         <div>
           <p className="text-gray-500 text-sm">{t('cart.total_qty')}:</p>
           <p className="text-xl font-bold text-gray-800">
-            {items.reduce((acc, item) => acc + (item.players ? item.players.length : item.quantity), 0)} {t('order.pcs')}
+            {items.reduce((acc, item) => {
+              if (item.players) return acc + item.players.length;
+              if (item.multiSize) return acc + Object.values(item.multiSize).reduce((a, b) => a + b, 0);
+              return acc + (item.quantity || 0);
+            }, 0)} {t('order.pcs')}
           </p>
         </div>
         <Button onClick={onNext} variant="primary" size="lg">{t('cart.checkout_btn')}</Button>

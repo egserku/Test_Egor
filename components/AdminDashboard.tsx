@@ -513,13 +513,30 @@ export const AdminDashboard: React.FC = () => {
                               <div className="flex flex-wrap gap-2 mt-2">
                                 <span className="px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold text-gray-600 uppercase">{item.color}</span>
                                 {item.fabric && <span className="px-2 py-1 bg-amber-100 rounded-md text-[10px] font-bold text-amber-700 uppercase">{t('order_form.fabric_choice')}: {item.fabric}</span>}
-                                {!isTeamItem && <span className="px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold text-gray-600 uppercase">{t('order_form.sizes').split(' ')[0]}: {item.sizes ? Object.entries(item.sizes).map(([s, q]) => `${s}(${q})`).join(', ') : item.size}</span>}
+                                {item.size && !isTeamItem && <span className="px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold text-gray-600 uppercase">{t('order_form.sizes').split(' ')[0]}: {item.size}</span>}
                                 <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${isTeamItem ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                                  {isTeamItem ? `${t('admin.composition')}: ${playersList.length || item.quantity}` : `${t('order.quantity')}: ${item.quantity} ${t('order.pcs')}`}
+                                  {isTeamItem ? `${t('admin.composition')}: ${playersList.length || item.quantity}` : `${t('order.quantity')}: ${item.multiSize ? Object.values(item.multiSize).reduce((a, b) => a + b, 0) : item.quantity} ${t('order.pcs')}`}
                                 </span>
                               </div>
                             </div>
                           </div>
+
+                          {item.multiSize && (
+                            <div className="mb-4 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+                              <p className="text-indigo-600 text-[10px] font-black uppercase mb-2 tracking-widest flex items-center gap-2">
+                                <span>📏 {t('order_form.sizes')}</span>
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(item.multiSize).map(([size, qty]) => (
+                                  <div key={size} className="bg-white px-3 py-1.5 rounded-lg border border-indigo-100 flex items-center gap-2 shadow-sm">
+                                    <span className="text-xs font-black text-indigo-600">{size}</span>
+                                    <span className="w-px h-3 bg-indigo-100"></span>
+                                    <span className="text-xs font-bold text-gray-600">x{qty}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-gray-50/50 p-4 rounded-xl border border-gray-100 mb-4">
                             {item.school && (<div><p className="text-gray-400 text-xs font-bold uppercase mb-1">{t('admin.school')}</p><p className="text-gray-800 font-medium">{item.school}</p></div>)}

@@ -74,12 +74,22 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
     } else {
         setFormData(prev => ({ ...prev, printPlaces: defaultPrintPlaces, sleeve: 'Короткий' }));
     }
-    getDesignFeedback(productType, initialSubtype).then(res => setTips(res || null));
-
     if (initialSubtype === OrderSubtype.SCHOOL) {
       apiService.getSchools().then(data => setSchoolsList(data));
     }
     apiService.getInventory().then(data => setInventory(data));
+
+    const handleDesignSaved = (e: any) => {
+      const { place, image, state } = e.detail;
+      setFormData(prev => ({
+        ...prev,
+        printPlaces: prev.printPlaces?.includes(place) ? prev.printPlaces : [...(prev.printPlaces || []), place],
+        printImages: { ...(prev.printImages || {}), [place]: image },
+        printStates: { ...(prev.printStates || {}), [place]: state }
+      }));
+    };
+    window.addEventListener('design-saved', handleDesignSaved);
+    return () => window.removeEventListener('design-saved', handleDesignSaved);
   }, [productType, initialSubtype]);
 
   const getStockForSize = (sizeName: string) => {
@@ -242,14 +252,23 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
       } as OrderItem));
       onAddToCart(items);
     } else if (isMultiSizeMode) {
+      // PERSONAL DESIGN: Group all selected sizes into ONE item to save space in database
       const sizes = Object.keys(multiSizeSelections);
       if (sizes.length === 0) return;
-      const items = sizes.map(sizeName => ({
-        ...formData, id: Math.random().toString(36).substr(2, 9),
-        type: productType, subtype: initialSubtype, size: sizeName,
-        quantity: multiSizeSelections[sizeName], images: allImages
-      } as OrderItem));
-      onAddToCart(items);
+      
+      const groupedItem: OrderItem = {
+        ...formData,
+        id: Math.random().toString(36).substr(2, 9),
+        type: productType,
+        subtype: initialSubtype,
+        multiSize: { ...multiSizeSelections },
+        images: allImages,
+        // Clear single size/qty to avoid confusion
+        size: undefined,
+        quantity: undefined
+      } as OrderItem;
+      
+      onAddToCart(groupedItem);
     } else {
       onAddToCart({ ...formData, id: Math.random().toString(36).substr(2, 9), type: productType, subtype: initialSubtype, images: allImages } as OrderItem);
     }
@@ -274,7 +293,56 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
       </div>
 
       <div className="space-y-10">
+        {/* 1. Color Selection */}
         {initialSubtype !== OrderSubtype.SCHOOL && (
+          <div>
+            <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.color')} {isMultiColorMode ? t('order_form.multi_color') : ''} {inventory.length > 0 && <span className="ml-2 text-[9px] text-gray-400 font-normal normal-case opacity-60">{t('order_form.stock_info')}</span>}</label>
+            <div className="grid grid-cols-5 gap-3">
+              {COLORS.map(c => {
+                const isSelected = isMultiColorMode ? !!multiColorSelections[c.name] : formData.color === c.name;
+                const stock = getStockForColor(c.name);
+                const isOut = stock !== null && stock <= 0;
+                return (
+                  <div key={c.hex} className="flex flex-col items-center gap-1">
+                    <button 
+                      disabled={isOut} 
+                      onClick={() => {
+                        if (isMultiColorMode) {
+                          setMultiColorSelections(p => ({...p, [c.name]: p[c.name] ? p[c.name] : 1}));
+                          setFormData(prev => ({ ...prev, color: c.name }));
+                        } else {
+                          setFormData(prev => ({ ...prev, color: c.name }));
+                        }
+                      }} 
+                      className={`w-full aspect-square rounded-[24px] transition-all relative flex items-center justify-center ${isOut ? 'opacity-20 cursor-not-allowed grayscale' : isSelected ? 'ring-4 ring-indigo-500 ring-offset-4 scale-[1.05]' : 'hover:scale-[1.05]'}`} 
+                      style={{ backgroundColor: c.hex, border: c.hex === '#FFFFFF' ? '1px solid #e5e7eb' : 'none' }}
+                    >
+                      {isSelected && <div className={`w-8 h-8 rounded-full flex items-center justify-center ${c.hex === '#FFFFFF' ? 'bg-indigo-600' : 'bg-white'}`}>{isMultiColorMode ? <span className={`${c.hex === '#FFFFFF' ? 'text-white' : 'text-gray-900'} font-black text-xs`}>{multiColorSelections[c.name]}</span> : <span className={`${c.hex === '#FFFFFF' ? 'text-white' : 'text-gray-900'} font-black text-lg`}>✓</span>}</div>}
+                    </button>
+                    {stock !== null && !isOut && <span className={`text-[8px] font-black tracking-tight ${stock < 10 ? 'text-red-500' : 'text-gray-400'}`}>{stock}{t('order.pcs')}</span>}
+                    {isOut && <span className="text-[8px] font-black tracking-tight text-gray-300 uppercase">{t('order_form.out_of_stock_short')}</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {isMultiColorMode && Object.keys(multiColorSelections).length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
+                 {Object.entries(multiColorSelections).map(([cName, qty]) => (
+                   <div key={cName} className="flex items-center justify-between bg-gray-50/50 p-4 rounded-[24px] border border-gray-100 shadow-sm">
+                      <span className="text-[13px] font-black text-gray-700 uppercase">{cName}</span>
+                      <div className="flex items-center bg-white/80 rounded-xl p-1 gap-4">
+                         <button onClick={() => setMultiColorSelections(p => { const n = {...p}; if(qty <= 1) delete n[cName]; else n[cName] = qty-1; return n; })} className="w-8 h-8 flex items-center justify-center font-bold text-lg">−</button>
+                         <span className="text-sm font-black">{qty}</span>
+                         <button onClick={() => setMultiColorSelections(p => ({...p, [cName]: qty+1}))} className="w-8 h-8 flex items-center justify-center font-bold text-lg">+</button>
+                      </div>
+                   </div>
+                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {initialSubtype === OrderSubtype.TEAM && (
           <div className="animate-in fade-in duration-700">
             <ProductPreview 
               key={`${productType}-${formData.color}`}
@@ -287,18 +355,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
           </div>
         )}
 
-        {tips && (
-          <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6">
-             <div className="flex items-center gap-2 mb-3">
-               <span className="text-lg">✨</span>
-               <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">{t('order_form.design_tips')}</h4>
-             </div>
-             <div className="text-xs text-indigo-900/80 leading-relaxed font-medium space-y-1">
-               {tips.split('\n').map((line, i) => <p key={i}>{line.trim()}</p>)}
-             </div>
-          </div>
-        )}
-
+        {/* 2. Model Selection (Hoodie/Cap) */}
         {(productType === ProductType.HOODIE || productType === ProductType.CAP) && !isTeamMode && (
           <div className="animate-in slide-in-from-left-4 duration-400">
             <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.model')} {productType === ProductType.CAP ? t('products.cap').toLowerCase() : t('products.hoodie').toLowerCase()}</label>
@@ -359,7 +416,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
           </div>
         )}
 
-        {/* Секция загрузки макетов для Личного Дизайна: Всегда 4 зоны для T-shirt/Hoodie */}
+        {/* 3. Design/Mockup Upload (Personal) or School Search */}
         {initialSubtype === OrderSubtype.PERSONAL ? (
           <div className="animate-in fade-in slide-in-from-top-4 duration-500">
             <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.upload_mockups')}</label>
@@ -404,16 +461,35 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
                     </div>
 
                     <input type="file" accept="image/*" className="hidden" ref={el => { fileInputRefs.current[place] = el; }} onChange={(e) => handleFileUpload(place, e)} />
-                    <button 
-                      disabled={isUploading}
-                      onClick={() => fileInputRefs.current[place]?.click()}
-                      className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                        isUploading ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
-                        hasImage ? 'bg-white text-indigo-600 border border-indigo-100' : 'bg-indigo-600 text-white shadow-md'
-                      }`}
-                    >
-                      {isUploading ? 'Загрузка...' : hasImage ? 'Заменить файл' : 'Выбрать макет'}
-                    </button>
+                    
+                    <div className="w-full space-y-2">
+                      <button 
+                        disabled={isUploading}
+                        onClick={() => fileInputRefs.current[place]?.click()}
+                        className={`w-full py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                          isUploading ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
+                          hasImage ? 'bg-white text-indigo-600 border border-indigo-100' : 'bg-indigo-600 text-white shadow-md'
+                        }`}
+                      >
+                        {isUploading ? 'Загрузка...' : hasImage ? 'Заменить файл' : 'Выбрать макет'}
+                      </button>
+                      
+                      {!isUploading && (
+                        <button 
+                          onClick={() => {
+                            const colorHex = COLORS.find(c => c.name === formData.color)?.hex || '#FFFFFF';
+                            const initialState = formData.printStates?.[place];
+                            (window as any).dispatchEvent(new CustomEvent('open-designer', { 
+                              detail: { place, color: colorHex, productType, initialState } 
+                            }));
+                          }}
+                          className="w-full py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white text-indigo-600 border-2 border-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
+                        >
+                          🎨 Открыть Дизайнер
+                        </button>
+                      )}
+                    </div>
+
                     {!hasImage && !isUploading && (
                       <p className="mt-3 text-[9px] text-gray-400 font-bold uppercase opacity-50">PNG, JPG до 5MB</p>
                     )}
@@ -437,9 +513,57 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
               ))}
               {schoolsList.length === 0 && <p className="col-span-full py-8 text-center text-gray-500 text-xs">Список школ загружается или пуст...</p>}
             </div>
+
+            {/* Color Selection for Schools */}
+            <div className="mt-10 pt-10 border-t border-gray-100">
+              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.color')} {isMultiColorMode ? t('order_form.multi_color') : ''} {inventory.length > 0 && <span className="ml-2 text-[9px] text-gray-400 font-normal normal-case opacity-60">{t('order_form.stock_info')}</span>}</label>
+              <div className="grid grid-cols-5 gap-3">
+                {COLORS.map(c => {
+                  const isSelected = isMultiColorMode ? !!multiColorSelections[c.name] : formData.color === c.name;
+                  const stock = getStockForColor(c.name);
+                  const isOut = stock !== null && stock <= 0;
+                  return (
+                    <div key={c.hex} className="flex flex-col items-center gap-1">
+                      <button 
+                        disabled={isOut} 
+                        onClick={() => {
+                          if (isMultiColorMode) {
+                            setMultiColorSelections(p => ({...p, [c.name]: p[c.name] ? p[c.name] : 1}));
+                            setFormData(prev => ({ ...prev, color: c.name }));
+                          } else {
+                            setFormData(prev => ({ ...prev, color: c.name }));
+                          }
+                        }} 
+                        className={`w-full aspect-square rounded-[24px] transition-all relative flex items-center justify-center ${isOut ? 'opacity-20 cursor-not-allowed grayscale' : isSelected ? 'ring-4 ring-indigo-500 ring-offset-4 scale-[1.05]' : 'hover:scale-[1.05]'}`} 
+                        style={{ backgroundColor: c.hex, border: c.hex === '#FFFFFF' ? '1px solid #e5e7eb' : 'none' }}
+                      >
+                        {isSelected && <div className={`w-8 h-8 rounded-full flex items-center justify-center ${c.hex === '#FFFFFF' ? 'bg-indigo-600' : 'bg-white'}`}>{isMultiColorMode ? <span className={`${c.hex === '#FFFFFF' ? 'text-white' : 'text-gray-900'} font-black text-xs`}>{multiColorSelections[c.name]}</span> : <span className={`${c.hex === '#FFFFFF' ? 'text-white' : 'text-gray-900'} font-black text-lg`}>✓</span>}</div>}
+                      </button>
+                      {stock !== null && !isOut && <span className={`text-[8px] font-black tracking-tight ${stock < 10 ? 'text-red-500' : 'text-gray-400'}`}>{stock}{t('order.pcs')}</span>}
+                      {isOut && <span className="text-[8px] font-black tracking-tight text-gray-300 uppercase">{t('order_form.out_of_stock_short')}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              {isMultiColorMode && Object.keys(multiColorSelections).length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
+                   {Object.entries(multiColorSelections).map(([cName, qty]) => (
+                     <div key={cName} className="flex items-center justify-between bg-gray-50/50 p-4 rounded-[24px] border border-gray-100 shadow-sm">
+                        <span className="text-[13px] font-black text-gray-700 uppercase">{cName}</span>
+                        <div className="flex items-center bg-white/80 rounded-xl p-1 gap-4">
+                           <button onClick={() => setMultiColorSelections(p => { const n = {...p}; if(qty <= 1) delete n[cName]; else n[cName] = qty-1; return n; })} className="w-8 h-8 flex items-center justify-center font-bold text-lg">−</button>
+                           <span className="text-sm font-black">{qty}</span>
+                           <button onClick={() => setMultiColorSelections(p => ({...p, [cName]: qty+1}))} className="w-8 h-8 flex items-center justify-center font-bold text-lg">+</button>
+                        </div>
+                     </div>
+                   ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
+        {/* 6. Other Fields (Gender, Fabric, PlayerTable, Wishes) */}
         {productType !== ProductType.CAP && 
          productType !== ProductType.TANK_TOP && 
          productType !== ProductType.HOODIE && 
@@ -464,6 +588,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
           </div>
         )}
 
+        {/* 5. Sleeve Length (T-shirt) */}
         {productType === ProductType.TSHIRT && !isTeamMode && (
           <div className="animate-in slide-in-from-left-4 duration-400">
             <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.sleeve_length')}</label>
@@ -514,6 +639,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
           </div>
         )}
 
+        {/* 4. Size Selection */}
         {!isTeamMode && productType !== ProductType.CAP && (
           <div>
             <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.sizes')} {inventory.length > 0 && <span className="ml-2 text-[9px] text-gray-400 font-normal normal-case opacity-60">{t('order_form.stock_info')}</span>}</label>
@@ -545,52 +671,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({ productType, initialSubtyp
             </div>
           </div>
         )}
-
-        <div>
-          <label className="block text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">{t('order_form.color')} {isMultiColorMode ? t('order_form.multi_color') : ''} {inventory.length > 0 && <span className="ml-2 text-[9px] text-gray-400 font-normal normal-case opacity-60">{t('order_form.stock_info')}</span>}</label>
-          <div className="grid grid-cols-5 gap-3">
-            {COLORS.map(c => {
-              const isSelected = isMultiColorMode ? !!multiColorSelections[c.name] : formData.color === c.name;
-              const stock = getStockForColor(c.name);
-              const isOut = stock !== null && stock <= 0;
-              return (
-                <div key={c.hex} className="flex flex-col items-center gap-1">
-                  <button 
-                    disabled={isOut} 
-                    onClick={() => {
-                      if (isMultiColorMode) {
-                        setMultiColorSelections(p => ({...p, [c.name]: p[c.name] ? p[c.name] : 1}));
-                        setFormData(prev => ({ ...prev, color: c.name }));
-                      } else {
-                        setFormData(prev => ({ ...prev, color: c.name }));
-                      }
-                    }} 
-                    className={`w-full aspect-square rounded-[24px] transition-all relative flex items-center justify-center ${isOut ? 'opacity-20 cursor-not-allowed grayscale' : isSelected ? 'ring-4 ring-indigo-500 ring-offset-4 scale-[1.05]' : 'hover:scale-[1.05]'}`} 
-                    style={{ backgroundColor: c.hex, border: c.hex === '#FFFFFF' ? '1px solid #e5e7eb' : 'none' }}
-                  >
-                    {isSelected && <div className={`w-8 h-8 rounded-full flex items-center justify-center ${c.hex === '#FFFFFF' ? 'bg-indigo-600' : 'bg-white'}`}>{isMultiColorMode ? <span className={`${c.hex === '#FFFFFF' ? 'text-white' : 'text-gray-900'} font-black text-xs`}>{multiColorSelections[c.name]}</span> : <span className={`${c.hex === '#FFFFFF' ? 'text-white' : 'text-gray-900'} font-black text-lg`}>✓</span>}</div>}
-                  </button>
-                  {stock !== null && !isOut && <span className={`text-[8px] font-black tracking-tight ${stock < 10 ? 'text-red-500' : 'text-gray-400'}`}>{stock}{t('order.pcs')}</span>}
-                  {isOut && <span className="text-[8px] font-black tracking-tight text-gray-300 uppercase">{t('order_form.out_of_stock_short')}</span>}
-                </div>
-              );
-            })}
-          </div>
-          {isMultiColorMode && Object.keys(multiColorSelections).length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
-               {Object.entries(multiColorSelections).map(([cName, qty]) => (
-                 <div key={cName} className="flex items-center justify-between bg-gray-50/50 p-4 rounded-[24px] border border-gray-100 shadow-sm">
-                    <span className="text-[13px] font-black text-gray-700 uppercase">{cName}</span>
-                    <div className="flex items-center bg-white/80 rounded-xl p-1 gap-4">
-                       <button onClick={() => setMultiColorSelections(p => { const n = {...p}; if(qty <= 1) delete n[cName]; else n[cName] = qty-1; return n; })} className="w-8 h-8 flex items-center justify-center font-bold text-lg">−</button>
-                       <span className="text-sm font-black">{qty}</span>
-                       <button onClick={() => setMultiColorSelections(p => ({...p, [cName]: qty+1}))} className="w-8 h-8 flex items-center justify-center font-bold text-lg">+</button>
-                    </div>
-                 </div>
-               ))}
-            </div>
-          )}
-        </div>
 
         {isTeamMode && <PlayerTable players={formData.players || []} onChange={(players) => setFormData({ ...formData, players })} productType={productType} />}
 

@@ -53,6 +53,33 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+/**
+ * Recursively removes undefined values from an object.
+ * Firestore does not support undefined values.
+ */
+function sanitizeData(data: any): any {
+  if (data === null || typeof data !== 'object') {
+    return data;
+  }
+
+  // Preserve Firestore Timestamps
+  if (data instanceof Timestamp) {
+    return data;
+  }
+
+  if (Array.isArray(data)) {
+    return data.map(sanitizeData);
+  }
+
+  const sanitized: any = {};
+  for (const key in data) {
+    if (data[key] !== undefined) {
+      sanitized[key] = sanitizeData(data[key]);
+    }
+  }
+  return sanitized;
+}
+
 export const apiService = {
   /**
    * Subscribe to real-time order updates
@@ -121,12 +148,12 @@ export const apiService = {
   submitOrder: async (order: Order, uid: string): Promise<void> => {
     try {
       const orderRef = doc(collection(db, 'orders'), order.orderNumber);
-      await setDoc(orderRef, {
+      await setDoc(orderRef, sanitizeData({
         ...order,
         uid,
         createdAt: Timestamp.now(), // Use Firestore Timestamp for server-side time
         status: 'New'
-      });
+      }));
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `orders/${order.orderNumber}`);
     }
@@ -138,7 +165,7 @@ export const apiService = {
   updateOrder: async (orderNumber: string, data: Partial<Order>): Promise<void> => {
     try {
       const orderRef = doc(db, 'orders', orderNumber);
-      await updateDoc(orderRef, data);
+      await updateDoc(orderRef, sanitizeData(data));
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `orders/${orderNumber}`);
     }
@@ -183,7 +210,7 @@ export const apiService = {
       const schoolId = school.id || Date.now().toString();
       const schoolRef = doc(db, 'schools', schoolId);
       const { id, ...data } = school;
-      await setDoc(schoolRef, data, { merge: true });
+      await setDoc(schoolRef, sanitizeData(data), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `schools/${school.id}`);
     }
@@ -249,7 +276,7 @@ export const apiService = {
   addInventoryItem: async (item: InventoryItem): Promise<void> => {
     try {
       const { id, ...data } = item;
-      await setDoc(doc(db, 'inventory', id), data);
+      await setDoc(doc(db, 'inventory', id), sanitizeData(data));
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `inventory/${item.id}`);
     }

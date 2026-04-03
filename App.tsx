@@ -8,6 +8,7 @@ import { CustomerInfo } from './components/CustomerInfo';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLogin } from './components/AdminLogin';
 import { UserDashboard } from './components/UserDashboard';
+import { DesignerLab } from './components/DesignerLab';
 import { generateOrderSummaryDescription } from './services/geminiService';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
@@ -22,11 +23,14 @@ enum Step {
   SUCCESS,
   ERROR,
   ADMIN,
-  USER_PROFILE
+  USER_PROFILE,
+  LAB
 }
 
 const App: React.FC = () => {
   const [step, setStep] = useState<Step>(Step.SELECT_CATEGORY);
+  const [designerData, setDesignerData] = useState<{ place: string, color: string, productType: string, initialState?: string } | null>(null);
+  const [editingOrderInfo, setEditingOrderInfo] = useState<{ order: Order, itemIdx: number } | null>(null);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<OrderSubtype | null>(null);
   const [activeType, setActiveType] = useState<ProductType | null>(null);
@@ -56,6 +60,46 @@ const App: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const handleOpenDesigner = (e: any) => {
+      setDesignerData(e.detail);
+      setStep(Step.LAB);
+    };
+    window.addEventListener('open-designer', handleOpenDesigner);
+    return () => window.removeEventListener('open-designer', handleOpenDesigner);
+  }, []);
+
+  const handleSaveDesign = async (imageData: string, stateData: string) => {
+    if (editingOrderInfo && designerData) {
+      // We are editing an existing order
+      const { order, itemIdx } = editingOrderInfo;
+      const updatedItems = [...order.items];
+      const item = { ...updatedItems[itemIdx] };
+      
+      item.printImages = { ...item.printImages, [designerData.place]: imageData };
+      item.printStates = { ...item.printStates, [designerData.place]: stateData };
+      updatedItems[itemIdx] = item;
+
+      try {
+        await apiService.updateOrder(order.orderNumber, { items: updatedItems });
+        setStep(Step.USER_PROFILE);
+      } catch (error) {
+        console.error("Failed to update order design:", error);
+        setErrorMessage("Не удалось сохранить изменения в заказе. Пожалуйста, попробуйте еще раз.");
+        setStep(Step.ERROR);
+      }
+    } else if (designerData) {
+      // Normal cart design
+      window.dispatchEvent(new CustomEvent('design-saved', { 
+        detail: { place: designerData.place, image: imageData, state: stateData } 
+      }));
+      setStep(Step.CONFIGURE);
+    }
+    
+    setDesignerData(null);
+    setEditingOrderInfo(null);
+  };
 
   const login = async () => {
     try {
@@ -182,6 +226,15 @@ const App: React.FC = () => {
                   {t('user.my_orders')}
                 </button>
               )}
+              {isAdminAuthenticated && (
+                <button 
+                  onClick={() => setStep(Step.LAB)} 
+                  className={`p-2.5 md:p-2 rounded-xl transition-all ${step === Step.LAB ? 'bg-white text-indigo-600' : 'bg-white/10 hover:bg-white/30 text-white'}`}
+                  title="Designer Lab"
+                >
+                  🧪
+                </button>
+              )}
               {user ? (
                 <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-2xl backdrop-blur-md">
                   {user.photoURL && <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full border border-white/20" />}
@@ -277,13 +330,15 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {step === Step.CONFIGURE && activeType && activeCategory && (
-          <OrderForm 
-            productType={activeType} 
-            initialSubtype={activeCategory}
-            onAddToCart={addToCart} 
-            onCancel={() => setStep(Step.SELECT_PRODUCT)} 
-          />
+        {(step === Step.CONFIGURE || step === Step.LAB) && activeType && activeCategory && (
+          <div className={step === Step.CONFIGURE ? 'block' : 'hidden'}>
+            <OrderForm 
+              productType={activeType} 
+              initialSubtype={activeCategory}
+              onAddToCart={addToCart} 
+              onCancel={() => setStep(Step.SELECT_PRODUCT)} 
+            />
+          </div>
         )}
 
         {step === Step.CHECKOUT && (
@@ -295,7 +350,38 @@ const App: React.FC = () => {
         )}
 
         {step === Step.USER_PROFILE && (
-          <UserDashboard onBack={() => setStep(Step.SELECT_CATEGORY)} />
+          <UserDashboard 
+            onBack={() => setStep(Step.SELECT_CATEGORY)} 
+            onEditDesign={(order, itemIdx, place) => {
+              const item = order.items[itemIdx];
+              setEditingOrderInfo({ order, itemIdx });
+              setDesignerData({
+                place,
+                color: item.color,
+                productType: item.type,
+                initialState: item.printStates?.[place]
+              });
+              setStep(Step.LAB);
+            }}
+          />
+        )}
+
+        {step === Step.LAB && (
+          <DesignerLab 
+            onBack={() => {
+              if (editingOrderInfo) {
+                setStep(Step.USER_PROFILE);
+                setEditingOrderInfo(null);
+                setDesignerData(null);
+              } else {
+                setStep(Step.CONFIGURE);
+              }
+            }}
+            onSave={handleSaveDesign}
+            initialColor={designerData?.color || '#ffffff'}
+            productType={designerData?.productType || 'T-shirt'}
+            initialState={designerData?.initialState}
+          />
         )}
 
         {step === Step.SUCCESS && (

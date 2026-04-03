@@ -43,15 +43,16 @@ export interface OrderItem {
   printPlaces: string[];
   images: string[]; // Generic list for backwards compatibility
   printImages?: Record<string, string>; // Mapping: Place -> Image Data
+  printStates?: Record<string, string>; // Mapping: Place -> Fabric JSON State
   players?: Player[];
   hoodieType?: HoodieType;
   capType?: CapType;
   gender?: 'Мальчик' | 'Девочка' | 'Универсальный';
   sleeve?: string;
-  size: string;
+  size?: string;
   color: string;
-  quantity: number;
-  sizes?: Record<string, number>; // Map of size -> quantity for multi-size orders
+  quantity?: number;
+  multiSize?: Record<string, number>;
   fabric?: string;
   wishes?: string;
 }

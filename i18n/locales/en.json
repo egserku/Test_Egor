@@ -124,13 +124,21 @@
     "order_number": "Order Number",
     "new_order": "Create New Order",
     "error_title": "Error",
-    "login_google": "Login with Google"
+    "login_google": "Login with Google",
+    "edit": "Edit"
   },
   "user": {
     "my_orders": "My Orders",
     "login_required": "Please login to see your orders",
     "no_orders": "You have no orders yet",
-    "no_orders_desc": "Your orders will appear here after checkout"
+    "no_orders_desc": "Your orders will appear here after checkout",
+    "no_design": "No design created"
+  },
+  "places": {
+    "Спереди": "Front",
+    "Сзади": "Back",
+    "Левый рукав": "Left Sleeve",
+    "Правый рукав": "Right Sleeve"
   },
   "products": {
     "tshirt": "T-shirt",

@@ -6,7 +6,10 @@ import { apiService } from '../services/apiService';
 import { useTranslation } from 'react-i18next';
 import { Button } from './ui/Button';
 
-export const UserDashboard: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+export const UserDashboard: React.FC<{ 
+  onBack: () => void,
+  onEditDesign: (order: Order, itemIdx: number, place: string) => void 
+}> = ({ onBack, onEditDesign }) => {
   const { t } = useTranslation();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +41,33 @@ export const UserDashboard: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       case 'Completed': return 'bg-green-100 text-green-600';
       case 'Cancelled': return 'bg-red-100 text-red-600';
       default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const updateQuantity = async (order: Order, itemIdx: number, newQty: number) => {
+    if (newQty < 1) return;
+    const updatedItems = [...order.items];
+    updatedItems[itemIdx] = { ...updatedItems[itemIdx], quantity: newQty };
+    try {
+      await apiService.updateOrder(order.orderNumber, { items: updatedItems });
+    } catch (error) {
+      console.error("Failed to update quantity:", error);
+    }
+  };
+
+  const updateMultiSizeQuantity = async (order: Order, itemIdx: number, size: string, newQty: number) => {
+    if (newQty < 0) return;
+    const updatedItems = [...order.items];
+    const item = { ...updatedItems[itemIdx] };
+    if (item.multiSize) {
+      const newMultiSize = { ...item.multiSize, [size]: newQty };
+      item.multiSize = newMultiSize;
+      updatedItems[itemIdx] = item;
+      try {
+        await apiService.updateOrder(order.orderNumber, { items: updatedItems });
+      } catch (error) {
+        console.error("Failed to update multi-size quantity:", error);
+      }
     }
   };
 
@@ -90,11 +120,87 @@ export const UserDashboard: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{t('admin.composition')}</h4>
                   <div className="space-y-2">
                     {order.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-3 text-sm font-medium text-gray-700">
-                        <span className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-[10px] font-bold">{item.quantity}</span>
-                        <span>{t(`products.${item.type.toLowerCase().replace('-', '_')}`)}</span>
-                        <span className="text-gray-300">•</span>
-                        <span className="text-gray-500">{item.color}, {item.sizes ? Object.entries(item.sizes).map(([s, q]) => `${s}(${q})`).join(', ') : item.size}</span>
+                      <div key={idx} className="space-y-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                            <span className="w-6 h-6 bg-white rounded-lg flex items-center justify-center text-[10px] font-bold shadow-sm border border-gray-100">
+                              {item.multiSize ? Object.values(item.multiSize).reduce((a, b) => a + b, 0) : item.quantity}
+                            </span>
+                            <span className="font-bold">{t(`products.${item.type.toLowerCase().replace('-', '_')}`)}</span>
+                            <span className="text-gray-300">•</span>
+                            <span className="text-gray-500">
+                              {item.color}
+                              {item.size && `, ${item.size}`}
+                            </span>
+                          </div>
+
+                          {/* Quantity Editor */}
+                          {order.status === 'New' && (
+                            <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-2">{t('order.quantity')}</span>
+                              {item.multiSize ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {Object.entries(item.multiSize).map(([size, qty]) => (
+                                    <div key={size} className="flex flex-col gap-1">
+                                      <span className="text-[10px] font-bold text-gray-500">{size}</span>
+                                      <div className="flex items-center gap-1">
+                                        <button 
+                                          onClick={() => updateMultiSizeQuantity(order, idx, size, qty - 1)}
+                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-xs transition-colors"
+                                        >-</button>
+                                        <span className="text-xs font-mono font-bold w-6 text-center">{qty}</span>
+                                        <button 
+                                          onClick={() => updateMultiSizeQuantity(order, idx, size, qty + 1)}
+                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-xs transition-colors"
+                                        >+</button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-3">
+                                  <button 
+                                    onClick={() => updateQuantity(order, idx, (item.quantity || 1) - 1)}
+                                    className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
+                                  >-</button>
+                                  <span className="text-sm font-mono font-bold w-8 text-center">{item.quantity}</span>
+                                  <button 
+                                    onClick={() => updateQuantity(order, idx, (item.quantity || 1) + 1)}
+                                    className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
+                                  >+</button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Design Previews */}
+                        {item.printImages && Object.keys(item.printImages).length > 0 && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {Object.entries(item.printImages).map(([place, img]) => (
+                              <div key={place} className="relative group">
+                                <div className="aspect-square bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                                  <img src={img} alt={place} className="w-full h-full object-contain p-2" />
+                                </div>
+                                <div className="mt-1 flex flex-col gap-1">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t(`places.${place}`)}</span>
+                                  {order.status === 'New' && (
+                                    <button 
+                                      onClick={() => onEditDesign(order, idx, place)}
+                                      className="text-[9px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1"
+                                    >
+                                      {t('common.edit')} 🎨
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {(!item.printImages || Object.keys(item.printImages).length === 0) && (
+                          <p className="text-[10px] text-gray-400 italic">{t('user.no_design')}</p>
+                        )}
                       </div>
                     ))}
                   </div>

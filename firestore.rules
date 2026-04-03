@@ -61,7 +61,8 @@ service cloud.firestore {
              data.status in ['New', 'Processing', 'Completed', 'Cancelled'] &&
              data.createdAt is timestamp &&
              data.customer is map &&
-             data.items is list;
+             data.items is list &&
+             data.viewed is bool;
     }
 
     function isValidSchool(data) {
